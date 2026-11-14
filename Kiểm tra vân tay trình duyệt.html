@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kiểm tra vân tay trình duyệt</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#14181f;--mut:#667085;--bd:#e3e6eb;--ac:#2563eb;--hi:#dc2626;--md:#d97706;--lo:#16a34a;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--card:#171b22;--tx:#e8ecf1;--mut:#8b95a5;--bd:#262c36;--ac:#60a5fa;--hi:#f87171;--md:#fbbf24;--lo:#4ade80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1116;--card:#171b22;--tx:#e8ecf1;--mut:#8b95a5;--bd:#262c36;--ac:#60a5fa;--hi:#f87171;--md:#fbbf24;--lo:#4ade80;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:900px;margin:0 auto;padding:18px 12px 40px}
+h1{font-size:20px;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px}
+.hash{font:600 14px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;color:var(--ac);margin:4px 0 10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:7px 13px;font:inherit;cursor:pointer}
+button.alt{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+input{flex:1;min-width:160px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;font:inherit}
+.pill{border:1px solid var(--bd);border-radius:999px;padding:2px 11px;font-size:12px}
+.pill b{font-weight:700}
+.note{color:var(--mut);font-size:12px;margin-top:8px}
+details{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin-bottom:8px;overflow:hidden}
+summary{cursor:pointer;padding:11px 14px;font-weight:600;display:flex;gap:8px;align-items:center;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--mut);transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+summary .n{color:var(--mut);font-weight:400;font-size:12px}
+summary .h{margin-left:auto;font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--ac)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+td{padding:5px 10px;border-top:1px solid var(--bd);vertical-align:top;font-size:13px}
+td:first-child{color:var(--mut);width:38%}
+td.v{font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all;font-size:12px}
+td.r{width:44px;text-align:right;font-size:11px;font-weight:700}
+.hi{color:var(--hi)}.md{color:var(--md)}.lo{color:var(--lo)}
+tr.x{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Trình duyệt của bạn đang khai gì với website?</h1>
+<p class="sub">Mọi thứ được đọc ngay trên máy bạn, không gửi đi đâu cả.</p>
+<div class="card">
+<div style="color:var(--mut);font-size:12px">Dấu vân tay tổng hợp (SHA-256)</div>
+<div class="hash" id="fp">Đang tính…</div>
+<div class="row"><button id="copy">Sao chép</button><button class="alt" id="again">Quét lại</button><input id="q" placeholder="Tìm mục (vd: webgl, canvas, múi giờ)"></div>
+<div class="row" style="margin-top:10px" id="score"></div>
+<div class="note" id="stab"></div>
+<div class="note">Các mục thay đổi liên tục tự cập nhật mỗi 1 giây. Lần cập nhật gần nhất: <b id="tick">-</b></div>
+<div class="note"><span class="hi">CAO</span> rất dễ nhận ra riêng bạn · <span class="md">VỪA</span> góp phần · <span class="lo">THẤP</span> nhiều người giống nhau. Mã bên phải mỗi nhóm là vân tay riêng của nhóm đó.</div>
+</div>
+<div id="out"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const sha=async s=>{try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return'fb'+(h>>>0).toString(16)}};
+const mq=q=>matchMedia(q).matches;
+const has=p=>{try{return p.split('.').reduce((o,k)=>o[k],window)!==undefined}catch(e){return false}};
+const yn=b=>b?'có':'không';
+const canvasFp=()=>{try{const c=document.createElement('canvas');c.width=260;c.height=60;const x=c.getContext('2d');x.textBaseline='top';x.font='16px Arial';x.fillStyle='#f60';x.fillRect(100,1,60,30);x.fillStyle='#069';x.fillText('Vân tay Xin chào 😀',2,15);x.fillStyle='rgba(102,204,0,.7)';x.font='18px Times New Roman';x.fillText('Vân tay Xin chào 😀',4,35);return c.toDataURL()}catch(e){return'n/a'}};
+const audioFp=async()=>{try{const C=window.OfflineAudioContext||window.webkitOfflineAudioContext;const ctx=new C(1,44100,44100);const o=ctx.createOscillator();o.type='triangle';o.frequency.value=10000;const k=ctx.createDynamicsCompressor();o.connect(k);k.connect(ctx.destination);o.start(0);const r=await ctx.startRendering();const d=r.getChannelData(0);let s=0;for(let i=4500;i<5000;i++)s+=Math.abs(d[i]);return String(s)}catch(e){return'n/a'}};
+const fonts=()=>{const list=['Arial','Arial Black','Calibri','Cambria','Candara','Comic Sans MS','Consolas','Courier New','Georgia','Helvetica','Helvetica Neue','Impact','Lucida Console','Menlo','Monaco','Palatino','Segoe UI','Tahoma','Times New Roman','Trebuchet MS','Verdana','Roboto','Ubuntu','Noto Sans','Open Sans','Futura','Gill Sans','Optima','Avenir','Apple Color Emoji','Segoe UI Emoji','MS Gothic','SimSun','Malgun Gothic','Cantarell','DejaVu Sans','Liberation Sans','Fira Code','Source Code Pro','Baskerville'];const base=['monospace','sans-serif','serif'];const s=document.createElement('span');s.style.cssText='position:absolute;left:-9999px;font-size:72px;visibility:hidden';s.textContent='mmmmmmmmmmlli';document.body.appendChild(s);const w={};base.forEach(b=>{s.style.fontFamily=b;w[b]=s.offsetWidth});const f=list.filter(n=>base.some(b=>{s.style.fontFamily="'"+n+"',"+b;return s.offsetWidth!==w[b]}));s.remove();return{found:f,total:list.length}};
+const GLP=['MAX_TEXTURE_SIZE','MAX_CUBE_MAP_TEXTURE_SIZE','MAX_RENDERBUFFER_SIZE','MAX_VERTEX_ATTRIBS','MAX_VERTEX_UNIFORM_VECTORS','MAX_FRAGMENT_UNIFORM_VECTORS','MAX_VARYING_VECTORS','MAX_COMBINED_TEXTURE_IMAGE_UNITS','MAX_VERTEX_TEXTURE_IMAGE_UNITS','MAX_TEXTURE_IMAGE_UNITS','ALIASED_LINE_WIDTH_RANGE','ALIASED_POINT_SIZE_RANGE','MAX_VIEWPORT_DIMS','SUBPIXEL_BITS','RED_BITS','GREEN_BITS','BLUE_BITS','ALPHA_BITS','DEPTH_BITS','STENCIL_BITS','SAMPLES','SAMPLE_BUFFERS'];
+const GL2P=['MAX_3D_TEXTURE_SIZE','MAX_ARRAY_TEXTURE_LAYERS','MAX_DRAW_BUFFERS','MAX_COLOR_ATTACHMENTS','MAX_SAMPLES','MAX_UNIFORM_BUFFER_BINDINGS','MAX_TEXTURE_LOD_BIAS'];
+const CODEC=[['MP4 H.264','video/mp4; codecs="avc1.42E01E"'],['MP4 H.265','video/mp4; codecs="hvc1.1.6.L93.B0"'],['MP4 AV1','video/mp4; codecs="av01.0.05M.08"'],['WebM VP8','video/webm; codecs="vp8"'],['WebM VP9','video/webm; codecs="vp9"'],['WebM AV1','video/webm; codecs="av01.0.05M.08"'],['Ogg Theora','video/ogg; codecs="theora"'],['MPEG-TS','video/mp2t'],['HLS','application/vnd.apple.mpegurl'],['MP3','audio/mpeg'],['AAC','audio/aac'],['MP4 AAC','audio/mp4; codecs="mp4a.40.2"'],['FLAC','audio/flac'],['WAV','audio/wav'],['Opus','audio/ogg; codecs="opus"'],['Vorbis','audio/ogg; codecs="vorbis"'],['WebM Opus','audio/webm; codecs="opus"'],['AIFF','audio/aiff']];
+const MSE=[['MSE H.264','video/mp4; codecs="avc1.42E01E,mp4a.40.2"'],['MSE VP9','video/webm; codecs="vp9,opus"'],['MSE AV1','video/mp4; codecs="av01.0.05M.08"'],['MSE HEVC','video/mp4; codecs="hvc1.1.6.L93.B0"']];
+const REC=['video/webm','video/webm;codecs=vp8','video/webm;codecs=vp9','video/webm;codecs=h264','video/mp4','audio/webm;codecs=opus'];
+const CSSF=['display|grid','grid-template-columns|subgrid','display|flex','container-type|inline-size','backdrop-filter|blur(2px)','aspect-ratio|1/1','gap|1px','color|color-mix(in srgb,red,blue)','color|oklch(50% .2 200)','color|lab(50% 20 20)','text-wrap|balance','accent-color|red','overscroll-behavior|contain','content-visibility|auto','mask-image|linear-gradient(#000,transparent)','clip-path|circle(50%)','position|sticky','inset|0','scroll-snap-type|x mandatory','font-variant-numeric|tabular-nums','animation-timeline|scroll()','anchor-name|--a','view-transition-name|a','scrollbar-width|thin','selector(:has(*))','selector(:is(a,b))','selector(:focus-visible)','selector(::backdrop)','at-rule(@property)'];
+const APIS=['navigator.gpu','navigator.bluetooth','navigator.usb','navigator.serial','navigator.hid','NDEFReader','navigator.xr','navigator.share','navigator.clipboard','navigator.credentials','navigator.wakeLock','navigator.getGamepads','navigator.vibrate','navigator.geolocation','navigator.mediaSession','navigator.locks','navigator.scheduling','navigator.ink','navigator.storage','navigator.serviceWorker','navigator.sendBeacon','WebAssembly','SharedArrayBuffer','OffscreenCanvas','Worker','SharedWorker','Notification','PushManager','BroadcastChannel','IntersectionObserver','ResizeObserver','MutationObserver','PerformanceObserver','RTCPeerConnection','MediaRecorder','webkitSpeechRecognition','speechSynthesis','AmbientLightSensor','Accelerometer','Gyroscope','DeviceOrientationEvent','DeviceMotionEvent','PaymentRequest','PublicKeyCredential','showOpenFilePicker','EyeDropper','BarcodeDetector','documentPictureInPicture','PointerEvent','TouchEvent','WebSocket','WebTransport','EventSource','CompressionStream','TextDecoder','structuredClone','requestIdleCallback','Intl.Segmenter','Intl.ListFormat','BigInt','AbortController','indexedDB','caches','crypto.subtle','CSS.paintWorklet','Highlight','VideoDecoder','AudioDecoder','Sanitizer'];
+async function collect(){
+const S=[];
+const sec=t=>{const s={t,i:[]};S.push(s);return(n,v,r='thấp',vol)=>s.i.push([n,String(v),r,vol])};
+const n=navigator,sc=screen;
+let ch=null;try{if(n.userAgentData)ch=await n.userAgentData.getHighEntropyValues(['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64'])}catch(e){}
+let a=sec('Trình duyệt & hệ điều hành');
+a('User-Agent',n.userAgent,'vừa');a('Nền tảng',n.platform,'vừa');a('Nhà cung cấp',n.vendor||'(trống)');a('appVersion',n.appVersion,'vừa');a('productSub',n.productSub);a('Phiên bản',n.userAgentData?JSON.stringify(n.userAgentData.brands):'không hỗ trợ','vừa');
+a('Di động (Client Hints)',n.userAgentData?n.userAgentData.mobile:'không rõ');a('Phiên bản đầy đủ',ch?JSON.stringify(ch.fullVersionList||[]):'không rõ','vừa');a('Kiến trúc',ch?ch.architecture||'?':'không rõ','vừa');a('Bitness',ch?ch.bitness||'?':'không rõ');a('Phiên bản HĐH',ch?ch.platformVersion||'?':'không rõ','vừa');a('Model thiết bị',ch?ch.model||'(trống)':'không rõ','vừa');
+a('Webdriver (bot)',n.webdriver);a('PDF viewer',n.pdfViewerEnabled);a('Cookie bật',n.cookieEnabled);a('Do Not Track',n.doNotTrack);a('Global Privacy Control',n.globalPrivacyControl);a('Java bật',n.javaEnabled?n.javaEnabled():'không rõ');a('Số plugin',n.plugins?n.plugins.length:0);a('Số mimeType',n.mimeTypes?n.mimeTypes.length:0);a('Secure context',isSecureContext);a('Cross-origin isolated',crossOriginIsolated);a('Giao thức',location.protocol);
+a=sec('Màn hình & hiển thị');
+a('Độ phân giải',sc.width+'×'+sc.height,'vừa');a('Vùng khả dụng',sc.availWidth+'×'+sc.availHeight,'vừa');a('availLeft/availTop',(sc.availLeft||0)+' / '+(sc.availTop||0));
+a('Cửa sổ trong',innerWidth+'×'+innerHeight,'vừa',1);a('Cửa sổ ngoài',outerWidth+'×'+outerHeight,'vừa',1);a('Vị trí cửa sổ',screenX+' / '+screenY,'thấp',1);
+a('Độ sâu màu',sc.colorDepth+' bit');a('Pixel depth',sc.pixelDepth+' bit');a('Pixel ratio',devicePixelRatio,'vừa');a('Resolution dppx',mq('(resolution:'+devicePixelRatio+'dppx)'));
+a('Hướng màn hình',sc.orientation?sc.orientation.type+' '+sc.orientation.angle+'°':'không rõ','thấp',1);a('Visual viewport scale',visualViewport?visualViewport.scale:'không rõ','thấp',1);
+a('Cảm ứng tối đa',n.maxTouchPoints,'vừa');a('Gam màu',mq('(color-gamut:rec2020)')?'rec2020':mq('(color-gamut:p3)')?'p3':'srgb');a('HDR',mq('(dynamic-range:high)'));
+a('Giao diện tối',mq('(prefers-color-scheme:dark)'));a('Giảm chuyển động',mq('(prefers-reduced-motion:reduce)'));a('Độ tương phản cao',mq('(prefers-contrast:more)'));a('Forced colors',mq('(forced-colors:active)'));a('Inverted colors',mq('(inverted-colors:inverted)'));
+a('Hover',mq('(hover:hover)'));a('Any-hover',mq('(any-hover:hover)'));a('Pointer',mq('(pointer:fine)')?'fine':mq('(pointer:coarse)')?'coarse':'none');a('Any-pointer',mq('(any-pointer:fine)')?'fine':'coarse');a('Display mode',['standalone','fullscreen','browser'].find(m=>mq('(display-mode:'+m+')')));a('Giảm trong suốt',mq('(prefers-reduced-transparency:reduce)'));
+a=sec('Phần cứng');
+a('Số luồng CPU',n.hardwareConcurrency,'vừa');a('RAM xấp xỉ',(n.deviceMemory||'không rõ')+' GB','vừa');
+let bat=null;try{if(n.getBattery)bat=await n.getBattery()}catch(e){}
+a('Mức pin',bat?Math.round(bat.level*100)+'%':'không hỗ trợ','vừa',1);a('Đang sạc',bat?bat.charging:'không rõ','thấp',1);
+let dv={};try{(await n.mediaDevices.enumerateDevices()).forEach(x=>dv[x.kind]=(dv[x.kind]||0)+1)}catch(e){}
+['audioinput','audiooutput','videoinput'].forEach(k=>a('Thiết bị '+k,dv[k]||0,'vừa'));
+let st={};try{st=await n.storage.estimate()}catch(e){}
+a('Hạn mức lưu trữ',st.quota?Math.round(st.quota/1048576)+' MB':'không rõ','vừa');a('Đã dùng',st.usage!==undefined?Math.round(st.usage/1024)+' KB':'không rõ','thấp',1);
+a('Heap JS tối đa',performance.memory?Math.round(performance.memory.jsHeapSizeLimit/1048576)+' MB':'không rõ','vừa');
+a('Độ phân giải đồng hồ',(()=>{let m=1e9,l=performance.now();for(let i=0;i<2000;i++){const t=performance.now();if(t>l&&t-l<m)m=t-l;l=t}return m===1e9?'không đo được':m.toFixed(4)+' ms'})(),'thấp',1);
+const g=(()=>{try{const c=document.createElement('canvas');return c.getContext('webgl')||c.getContext('experimental-webgl')}catch(e){return null}})();
+const g2=(()=>{try{return document.createElement('canvas').getContext('webgl2')}catch(e){return null}})();
+a=sec('WebGL (card đồ họa)');
+if(!g){a('WebGL','không hỗ trợ')}else{
+const e=g.getExtension('WEBGL_debug_renderer_info');
+a('GPU vendor',e?g.getParameter(e.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),'cao');a('GPU renderer',e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER),'cao');
+a('Phiên bản',g.getParameter(g.VERSION),'vừa');a('GLSL',g.getParameter(g.SHADING_LANGUAGE_VERSION),'vừa');a('WebGL2',yn(!!g2));
+const ex=g.getSupportedExtensions()||[];a('Số extension',ex.length,'vừa');a('Hash extension',(await sha(ex.join(','))).slice(0,16),'cao');
+GLP.forEach(k=>{const v=g.getParameter(g[k]);a(k,v&&v.length!==undefined?Array.from(v).join('×'):v,'vừa')});
+['HIGH_FLOAT','MEDIUM_FLOAT','HIGH_INT'].forEach(k=>{const p=g.getShaderPrecisionFormat(g.FRAGMENT_SHADER,g[k]);a('Precision '+k,p?p.rangeMin+'/'+p.rangeMax+'/'+p.precision:'-','vừa')});
+const an=g.getExtension('EXT_texture_filter_anisotropic');a('Anisotropy tối đa',an?g.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT):'không có','vừa');
+if(g2)GL2P.forEach(k=>a('GL2 '+k,g2.getParameter(g2[k]),'vừa'))}
+const c1=canvasFp(),c2=canvasFp(),au=await audioFp(),fl=fonts();
+a=sec('Canvas, âm thanh & phông chữ');
+a('Canvas hash',c1==='n/a'?'bị chặn':(await sha(c1)).slice(0,32),'cao');a('Canvas độ dài',c1.length,'vừa');a('Canvas ổn định',c1===c2?'có':'không (bị gây nhiễu)');
+a('Audio fingerprint',au,'cao');
+try{const C=window.AudioContext||window.webkitAudioContext;const x=new C();a('Audio sample rate',x.sampleRate,'vừa');a('Audio kênh tối đa',x.destination.maxChannelCount,'vừa');a('Audio base latency',x.baseLatency,'vừa');x.close()}catch(e){a('AudioContext','không hỗ trợ')}
+a('Số phông phát hiện',fl.found.length+' / '+fl.total,'cao');a('Danh sách phông',fl.found.join(', ')||'(không có)','cao');
+let vo=[];try{vo=speechSynthesis.getVoices();if(!vo.length)await new Promise(r=>{speechSynthesis.onvoiceschanged=r;setTimeout(r,400)});vo=speechSynthesis.getVoices()}catch(e){}
+a('Số giọng đọc',vo.length,'cao');a('Hash giọng đọc',vo.length?(await sha(vo.map(v=>v.name+v.lang).join('|'))).slice(0,16):'-','cao');
+a=sec('Ngôn ngữ, múi giờ & định dạng');
+const tz=Intl.DateTimeFormat().resolvedOptions(),d=new Date(2024,0,15,13,5,9);
+a('Ngôn ngữ chính',n.language,'vừa');a('Danh sách ngôn ngữ',(n.languages||[]).join(', '),'cao');a('Múi giờ',tz.timeZone,'cao');a('Lệch UTC (phút)',d.getTimezoneOffset(),'vừa');a('Lệch mùa hè',new Date(2024,6,1).getTimezoneOffset(),'vừa');
+a('Locale',tz.locale);a('Lịch',tz.calendar);a('Hệ số',tz.numberingSystem);a('Chu kỳ giờ',new Intl.DateTimeFormat(undefined,{hour:'numeric'}).resolvedOptions().hourCycle);
+a('Mẫu ngày',d.toLocaleDateString(),'vừa');a('Mẫu giờ',d.toLocaleTimeString(),'vừa');a('Mẫu số',(1234567.891).toLocaleString(),'vừa');a('Mẫu tiền tệ',(1234.5).toLocaleString(undefined,{style:'currency',currency:'USD'}),'vừa');
+a('Số nhiều',new Intl.PluralRules().select(1)+'/'+new Intl.PluralRules().select(2));a('Thời gian tương đối',new Intl.RelativeTimeFormat(undefined,{numeric:'auto'}).format(-1,'day'));
+a('Tên múi giờ dài',new Intl.DateTimeFormat(undefined,{timeZoneName:'long'}).format(d).split(',').pop().trim(),'vừa');
+a('Số múi giờ Intl',Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone').length:'không rõ','vừa');a('Số đơn vị Intl',Intl.supportedValuesOf?Intl.supportedValuesOf('unit').length:'không rõ');a('Số tiền tệ Intl',Intl.supportedValuesOf?Intl.supportedValuesOf('currency').length:'không rõ');
+a=sec('Codec & media');
+const au2=document.createElement('audio'),vi=document.createElement('video');
+CODEC.forEach(([l,t])=>a(l,(t.startsWith('audio')?au2:vi).canPlayType(t)||'không','vừa'));
+MSE.forEach(([l,t])=>a(l,window.MediaSource?yn(MediaSource.isTypeSupported(t)):'không hỗ trợ','vừa'));
+REC.forEach(t=>a('Recorder '+t,window.MediaRecorder?yn(MediaRecorder.isTypeSupported(t)):'không hỗ trợ','vừa'));
+a=sec('Tính năng CSS');
+CSSF.forEach(s=>{let ok;if(s.startsWith('selector(')||s.startsWith('at-rule('))ok=CSS.supports(s);else{const[p,...v]=s.split('|');ok=CSS.supports(p,v.join('|'))}a(s.replace('|',': '),yn(ok))});
+a=sec('API & tính năng JavaScript');
+APIS.forEach(p=>a(p,yn(has(p))));
+a=sec('Quyền, mạng & lưu trữ');
+for(const p of['geolocation','notifications','camera','microphone','clipboard-read','clipboard-write','persistent-storage','midi','accelerometer','screen-wake-lock']){let s='n/a';try{s=(await n.permissions.query({name:p})).state}catch(e){}a('Quyền '+p,s,'vừa')}
+const cn=n.connection||{};
+a('Loại kết nối',cn.effectiveType||'không rõ');a('Loại mạng',cn.type||'không rõ');a('Downlink',cn.downlink?cn.downlink+' Mbps':'không rõ','vừa',1);a('RTT',cn.rtt?cn.rtt+' ms':'không rõ','vừa',1);a('Tiết kiệm dữ liệu',cn.saveData);a('Online',n.onLine,'thấp',1);
+a('localStorage',(()=>{try{localStorage.setItem('t','1');localStorage.removeItem('t');return'dùng được'}catch(e){return'bị chặn'}})());a('sessionStorage',has('sessionStorage'));a('Referrer',document.referrer||'(trống)','thấp',1);a('Số trang lịch sử',history.length,'thấp',1);
+return{S,stable:c1===c2}}
+const cls={'cao':'hi','vừa':'md','thấp':'lo'};
+const cell=(tag,txt,c)=>{const e=document.createElement(tag);if(c)e.className=c;e.textContent=txt;return e};
+async function run(){
+$('#fp').textContent='Đang tính…';
+const{S,stable}=await collect();
+const out=$('#out');out.innerHTML='';
+const cnt={'cao':0,'vừa':0,'thấp':0};let total=0;const all=[];
+for(const s of S){
+const det=document.createElement('details');if(s.t.startsWith('Trình')||s.t.startsWith('WebGL')||s.t.startsWith('Canvas'))det.open=true;
+const sm=document.createElement('summary');sm.append(cell('span',s.t),cell('span','('+s.i.length+')','n'));
+const sh=await sha(s.i.filter(x=>!x[3]).map(x=>x[0]+'='+x[1]).join('|'));sm.append(cell('span',sh.slice(0,10),'h'));det.appendChild(sm);
+const w=document.createElement('div');w.className='scroll';const tb=document.createElement('table');
+s.i.forEach(([k,v,r,vol])=>{cnt[r]++;total++;if(!vol)all.push(k+'='+v);const tr=document.createElement('tr');if(vol)tr.dataset.k=k;tr.append(cell('td',k),cell('td',v,'v'),cell('td',r.toUpperCase(),'r '+cls[r]));tb.appendChild(tr)});
+w.appendChild(tb);det.appendChild(w);out.appendChild(det)}
+$('#fp').textContent=await sha(all.join('|'));
+const sc=$('#score');sc.innerHTML='';
+const t=document.createElement('span');t.className='pill';const tb2=document.createElement('b');tb2.textContent=total;t.append(tb2,' mục tổng');sc.appendChild(t);
+[['cao','hi'],['vừa','md'],['thấp','lo']].forEach(([k,c])=>{const p=document.createElement('span');p.className='pill';const b=document.createElement('b');b.className=c;b.textContent=cnt[k];p.append(b,' mức '+k);sc.appendChild(p)});
+$('#stab').textContent=stable?'Canvas ổn định giữa 2 lần vẽ: web có thể theo dõi bạn lâu dài bằng vân tay này.':'Canvas thay đổi giữa 2 lần vẽ: trình duyệt đang gây nhiễu (chống vân tay).';
+filter()}
+function filter(){const q=$('#q').value.trim().toLowerCase();document.querySelectorAll('details').forEach(d=>{let any=false;d.querySelectorAll('tr').forEach(r=>{const m=!q||r.textContent.toLowerCase().includes(q);r.classList.toggle('x',!m);if(m)any=true});d.style.display=any?'':'none';if(q&&any)d.open=true})}
+$('#q').oninput=filter;
+$('#copy').onclick=()=>{try{navigator.clipboard.writeText($('#fp').textContent);$('#copy').textContent='Đã chép'}catch(e){}setTimeout(()=>$('#copy').textContent='Sao chép',1500)};
+let bt=null;
+async function live(){
+const n=navigator,sc=screen,cn=n.connection||{},m={};
+m['Cửa sổ trong']=innerWidth+'×'+innerHeight;
+m['Cửa sổ ngoài']=outerWidth+'×'+outerHeight;
+m['Vị trí cửa sổ']=screenX+' / '+screenY;
+m['Hướng màn hình']=screen.orientation?screen.orientation.type+' '+screen.orientation.angle+'°':'không rõ';
+m['Visual viewport scale']=window.visualViewport?visualViewport.scale:'không rõ';
+if(!bt&&n.getBattery){try{bt=await n.getBattery()}catch(e){}}
+m['Mức pin']=bt?Math.round(bt.level*100)+'%':'không hỗ trợ';
+m['Đang sạc']=bt?bt.charging:'không rõ';
+try{const e=await n.storage.estimate();m['Đã dùng']=Math.round(e.usage/1024)+' KB'}catch(e){}
+m['Downlink']=cn.downlink?cn.downlink+' Mbps':'không rõ';
+m['RTT']=cn.rtt?cn.rtt+' ms':'không rõ';
+m['Online']=n.onLine;
+m['Số trang lịch sử']=history.length;
+document.querySelectorAll('tr[data-k]').forEach(tr=>{const v=m[tr.dataset.k];if(v!==undefined)tr.children[1].textContent=String(v)});
+$('#tick').textContent=new Date().toLocaleTimeString();
+}
+setInterval(live,1000);
+$('#again').onclick=run;
+run();
+</script>
+</body>
+</html>
